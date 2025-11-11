@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=yes" />
+<title>Retail Clouds — Professional Billing</title>
+
+<!-- Inter font -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<!-- SheetJS for Excel parsing -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<style>
+  :root{ --primary:#0b5ed7; --accent:#0d6efd; --bg:#f3f6fb;}
+  *{box-sizing:border-box;font-family:Inter,system-ui,sans-serif;}
+  body{margin:0;background:var(--bg);color:#162042;}
+  header{background:linear-gradient(90deg,#0b5ed7,#0a58ca);color:white;padding:10px 15px;display:flex;align-items:center;gap:12px;position:relative;}
+  header h1{margin:0;font-size:18px;font-weight:600;text-align:center;flex:1;}
+  .logout-btn{position:absolute;right:30px;top:28px;background:#fff;color:#0b5ed7;font-weight:700;padding:3px 15px;border-radius:7px;cursor:pointer;}
+  #loginPage{display:flex;align-items:center;justify-content:center;height:100vh;width:100vw;position:fixed;top:0;left:0;background:var(--bg);z-index:120;}
+  .login-card{background:white;max-width:95vw;width:370px;padding:38px 32px 32px 32px;border-radius:18px;box-shadow:0 10px 38px 0 rgba(70,94,170,0.13);}
+  .login-card h2{text-align:center;font-size:23px;margin-bottom:6px;}
+  .login-card .logo{display:block;margin:0 auto 12px auto;height:54px;}
+  .login-card label{display:block;font-weight:500;font-size:15px;margin:14px 0 3px 4px;}
+  .login-card input[type='text'],.login-card input[type='password']{width:100%;padding:11px 10px;border-radius:7px;border:1px solid #dddce4;font-size:15px;background:#f6f8fb;}
+  .login-card button{width:100%;margin-top:25px;padding:11px 0;font-size:16px;border-radius:7px;background:var(--primary);color:white;font-weight:700;border:none;cursor:pointer;}
+  .login-error{color:#d40101;text-align:center;margin-top:10px;font-size:15px;}
+  .login-success{color:#017501;text-align:center;margin-top:9px;font-size:16px;}
+  .container{display:flex;gap:20px;max-width:1800px;margin:22px auto;padding:0 8px;}
+  nav{width:260px;background:#fff;border-radius:12px;box-shadow:0 6px 18px rgba(11,78,175,0.08);padding:14px;}
+  nav button{width:100%;display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;border:none;background:transparent;cursor:pointer;color:#0f172a;font-weight:600;}
+  nav button.active{background:linear-gradient(90deg,#0d6efd,#0b5ed7);color:white;}
+  main{flex:1;min-width:0;}
+  .logo-preview{height:42px;object-fit:contain;border-radius:6px;}
+  .card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 6px 18px rgba(11,78,175,0.08);margin-bottom:18px;max-width:none;}
+  input[type="text"], input[type="number"], select{padding:10px;border-radius:8px;border:1px solid #e6eef8;min-width:0;width:100%;}
+  .btn{background:var(--accent);color:white;padding:10px 14px;border:none;border-radius:8px;cursor:pointer;font-weight:600;}
+  .btn.ghost{background:transparent;color:var(--accent);border:1px solid rgba(13,110,253,0.12);}
+  .alert-msg{color:#e53e3e;padding:3px 0 0 6px;font-size:15px;display:inline-block;}
+  table{width:100%;border-collapse:collapse;margin-top:12px;table-layout:auto;}
+  th,td{padding:9px;border-bottom:1px solid #eef3fb;text-align:left;font-size:14px;}
+  th{color:var(--muted);font-weight:600;}
+  .right{text-align:right;}
+  .amount-cell{ text-align:right;}
+  .small-muted{font-size:13px;color:#6b7280;text-align:center;}
+  .total-amount-row td{ text-align:right !important;border-top:2px solid #b0cdf6;}
+  #invoiceModal{display:none;position:fixed;inset:0;align-items:center;justify-content:center;background:rgba(0,0,0,0.14);z-index:100;}
+  #invoiceModalContent{width:93vw;max-width:410px;background:#fff;border-radius:12px;padding:18px 12px 14px 12px;box-shadow:0 6px 24px rgba(11,78,175,0.12);position:relative;}
+  #invoiceModalContent button.close{position:absolute;top:11px;right:13px;background:none;border:none;font-size:21px;cursor:pointer;color:#0b5ed7;}
+  /* Recharge UI */
+  #rechargePage{display:none;}
+  .plans{display:flex;flex-wrap:wrap;gap:12px;}
+  .plan-card{background:#fff;border-radius:12px;padding:12px;border:1px solid #e6eef8;min-width:160px;box-shadow:0 2px 8px rgba(11,78,175,0.04);}
+  .plan-price{font-weight:800;font-size:18px;margin-top:6px;}
+  .sub-info{font-size:13px;color:#dbeafe;margin-left:12px;}
+  /* Excel upload input small */
+  .small-file{font-size:13px;color:#374151;}
+  @media(max-width:720px){ nav{display:none} .container{padding:10px;} header{padding:12px} .logout-btn{top:18px;right:12px} }
+</style>
+</head>
+<body>
+<div id="loginPage">
+  <form class="login-card" id="loginForm" onsubmit="return login(event);">
+    <img src="https://cdn.pixabay.com/photo/2017/01/10/18/04/cloud-1970488_960_720.png" class="logo" alt="Retail Clouds" />
+    <h2>Login</h2>
+    <label for="customerId">Customer ID</label>
+    <input id="customerId" type="text" autocomplete="off" placeholder="Customer ID (ex: 000001)" required />
+    <label for="userId">User ID</label>
+    <input id="userId" type="text" autocomplete="off" placeholder="User ID (ex: venkatesh)" required />
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="off" placeholder="Password" required />
+    <button type="submit">Login</button>
+    <div id="loginMsg"></div>
+  </form>
+</div>
+
+<div id="appContent" style="display:none;">
+<header>
+  <img id="topLogo" src="" alt="" class="logo-preview" style="display:none" />
+  <h1>Retail Clouds — Professional Billing System</h1>
+  <div style="display:flex;align-items:center;gap:12px;margin-left:auto;">
+    <div id="adminBalance" class="sub-info"></div>
+    <div id="subStatus" class="sub-info"></div>
+  </div>
+  <button class="logout-btn" onclick="logout()">Logout</button>
+  <div style="margin-left:auto;color:#dbeafe;font-size:13px;margin-bottom:20px;" id="topTime"></div>
+</header>
+
+<div class="container">
+  <nav class="card">
+    <button id="navItems" class="active" onclick="show('items')">📦 Items</button>
+    <button id="navBilling" onclick="show('billing')">🧾 Billing</button>
+    <button id="navSummary" onclick="show('summary')">📈 Summary</button>
+    <hr style="margin:10px 0;border:none;border-top:1px solid #eef3fb" />
+    <div style="display:flex;flex-direction:column;gap:7px;">
+      <label class="small-muted">Upload Company Logo</label>
+      <input type="file" id="logoUpload" accept="image/*" onchange="saveLogo(event)" />
+      <button class="btn ghost" onclick="clearLogo()">Clear Logo</button>
+    </div>
+    <hr style="margin:10px 0;border:none;border-top:1px solid #eef3fb" />
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <label class="small-muted">Bulk Upload Items (Excel)</label>
+      <input type="file" id="excelUpload" accept=".xls,.xlsx" />
+      <div class="small-file">Columns: <strong>name, price, gst</strong> (case-insensitive)</div>
+      <button class="btn ghost" onclick="triggerExcel()">Upload</button>
+    </div>
+  </nav>
+
+  <main>
+    <section id="items" class="card"></section>
+    <section id="billing" class="card" style="display:none"></section>
+    <section id="summary" class="card" style="display:none">
+      <h2 style="margin:0; text-align:center;">Bills Summary</h2>
+      <div style="display:flex;flex-wrap:wrap;gap:12px 16px;margin-bottom:8px;align-items:center;justify-content:center;">
+        <div class="small-muted">All completed Bills</div>
+        <div>
+          <span class="small-muted">Start</span>
+          <input type="date" id="billFilterStart" style="width:135px; padding:6px 8px;border-radius:7px;border:1px solid #dddce4;" oninput="onDateFilterChange()" />
+        </div>
+        <div>
+          <span class="small-muted">End</span>
+          <input type="date" id="billFilterEnd" style="width:135px; padding:6px 8px;border-radius:7px;border:1px solid #dddce4;" oninput="onDateFilterChange()" />
+        </div>
+        <input type="text" id="billFilterId" placeholder="Search Bill ID" style="padding:6px 8px;border-radius:7px;border:1px solid #dddce4;width:120px;" oninput="renderSummaryTable()" />
+        <button class="btn ghost" onclick="clearBillFilters()" style="padding:6px 13px;">Clear Filters</button>
+      </div>
+      <div id="billSummaryMsg" style="color:#c00;text-align:center;font-size:14px;"></div>
+      <table>
+        <thead>
+          <tr>
+            <th>Invoice #</th>
+            <th>Date</th>
+            <th>Customer</th>
+            <th class="right">Total</th>
+            <th class="right">Action</th>
+          </tr>
+        </thead>
+        <tbody id="summaryTable"></tbody>
+        <tfoot>
+          <tr class="total-amount-row">
+            <td colspan="3"></td>
+            <td class="amount-cell" id="billTotalCell"></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </section>
+
+    <!-- Recharge page embedded inside app -->
+    <section id="rechargePage" class="card" style="display:none;">
+      <h2 style="margin:0; text-align:center;">Recharge / Activate Subscription</h2>
+      <div style="margin:10px 0;color:#374151;text-align:center;">Choose a plan and simulate payment (demo). After payment the subscription will be active.</div>
+      <div class="plans" id="plansContainer"></div>
+      <div style="margin-top:12px;text-align:center;">
+        <button class="btn ghost" onclick="closeRechargePage()">Close</button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- item modal -->
+<div id="itemModal" style="display:none;position:fixed;inset:0;align-items:center;justify-content:center;background:rgba(2,6,23,0.45);z-index:80">
+  <div style="width:96vw;max-width:420px;background:white;border-radius:12px;padding:16px;box-shadow:0 6px 18px rgba(11,78,175,0.08);">
+    <h3 id="modalTitle" style="margin:0 0 8px 0">Add Item</h3>
+    <form id="itemForm" onsubmit="return saveModal(event);">
+      <div class="field">
+        <label class="small-muted">Item Name</label>
+        <input type="text" id="modalName" autocomplete="off" required />
+      </div>
+      <div class="field">
+        <label class="small-muted">Unit Price (₹)</label>
+        <input type="number" id="modalPrice" autocomplete="off" min="0" step="0.01" required />
+      </div>
+      <div class="field">
+        <label class="small-muted">GST (%)</label>
+        <input type="number" id="modalGst" autocomplete="off" min="0" step="0.01" required />
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+        <button type="button" class="btn ghost" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn">Save</button>
+      </div>
+      <span id="itemSaveMsg" class="small-muted" style="display:block;text-align:center;margin-top:12px"></span>
+    </form>
+  </div>
+</div>
+
+<!-- invoice modal -->
+<div id="invoiceModal">
+  <div id="invoiceModalContent"><button class="close" onclick="closeInvoiceModal()">×</button></div>
+</div>
+
+<!-- pay modal (simulated) -->
+<div id="payModal" style="display:none;position:fixed;inset:0;align-items:center;justify-content:center;background:rgba(2,6,23,0.55);z-index:160">
+  <div style="width:92vw;max-width:420px;background:white;border-radius:12px;padding:18px;box-shadow:0 8px 24px rgba(2,6,23,0.35);">
+    <h3 style="margin-top:0">Simulate Payment</h3>
+    <div id="payDetails" style="margin-bottom:8px;color:#374151;"></div>
+    <label class="small-muted">Enter any password to simulate successful payment</label>
+    <input type="password" id="payPassword" style="width:100%;padding:10px;border-radius:8px;border:1px solid #e6eef8;margin-bottom:12px" />
+    <div style="display:flex;justify-content:flex-end;gap:8px;">
+      <button class="btn ghost" onclick="closePayModal()">Cancel</button>
+      <button class="btn" onclick="confirmPayment()">Pay</button>
+    </div>
+    <div id="payMsg" style="color:#c00;margin-top:8px"></div>
+  </div>
+</div>
+
+<script>
+  /* -------------------------
+     App state & constants
+     -------------------------*/
+  function $(id){return document.getElementById(id);}
+  function money(x){ return '₹'+parseFloat(x||0).toFixed(2); }
+
+  const PLANS = [
+    { id:'p99', name:'30 days', days:30, price:99 },
+    { id:'p499', name:'6 months', days:180, price:499 },
+    { id:'p899', name:'1 year', days:365, price:899 }
+  ];
+
+  // storage keys
+  const ITEMS_KEY = 'retailclouds_items';
+  const INVOICES_KEY = 'retailclouds_invoices';
+  const SESSION_KEY = 'retailclouds_session';
+  const SUBS_KEY = 'retailclouds_subscriptions';
+  const ADMIN_KEY = 'retailclouds_admin_balance';
+  const LOGO_KEY = 'retailclouds_logo';
+
+  // inactivity: 10 minutes
+  const SESSION_TIMEOUT_MS = 10 * 60 * 1000;
+
+  // state
+  let items = [], invoices = [], editIndex = null, currentInvoiceItems = [], currentInvoiceCustomer = '';
+  let inactivityTimer = null;
+  let selectedPlanForPay = null;
+  let pendingLoginContext = null;
+
+  /* -------------------------
+     Utilities
+     -------------------------*/
+  function loadItems(){ const d = localStorage.getItem(ITEMS_KEY); items = d ? JSON.parse(d) : []; }
+  function saveItems(){ localStorage.setItem(ITEMS_KEY, JSON.stringify(items)); }
+  function loadInvoices(){ const d = localStorage.getItem(INVOICES_KEY); invoices = d ? JSON.parse(d) : []; }
+  function saveInvoices(){ localStorage.setItem(INVOICES_KEY, JSON.stringify(invoices)); }
+  function getSubscriptions(){ const d = localStorage.getItem(SUBS_KEY); return d ? JSON.parse(d) : {}; }
+  function saveSubscriptions(obj){ localStorage.setItem(SUBS_KEY, JSON.stringify(obj)); }
+  function getAdminBalance(){ return parseFloat(localStorage.getItem(ADMIN_KEY) || '0'); }
+  function addAdminBalance(amount){ const b = getAdminBalance() + parseFloat(amount); localStorage.setItem(ADMIN_KEY, b.toFixed(2)); updateAdminDisplay(); }
+  function updateAdminDisplay(){ $('adminBalance').textContent = 'Admin: ' + money(getAdminBalance()); }
+
+  function formatDate(d){
+    const dd = String(d.getDate()).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const yyyy = d.getFullYear();
+    return dd + '/' + mm + '/' + yyyy;
+  }
+
+  function isSubscriptionActive(cid, uid){
+    const subs = getSubscriptions();
+    const key = cid + '|' + uid;
+    const expiry = subs[key] || 0;
+    return expiry > Date.now();
+  }
+
+  function getSubscriptionDaysLeft(cid, uid){
+    const subs = getSubscriptions();
+    const key = cid + '|' + uid;
+    const expiry = subs[key] || 0;
+    if (expiry <= Date.now()) return 0;
+    return Math.ceil((expiry - Date.now()) / (1000*60*60*24));
+  }
+
+  /* -------------------------
+     Logo
+     -------------------------*/
+  function saveLogo(ev){
+    const f = ev.target.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = e => { $('topLogo').src = e.target.result; $('topLogo').style.display='block'; localStorage.setItem(LOGO_KEY, e.target.result); }
+    r.readAsDataURL(f);
+  }
+  function loadLogo(){
+    const d = localStorage.getItem(LOGO_KEY);
+    if(d){ $('topLogo').src = d; $('topLogo').style.display='block'; } else { $('topLogo').style.display='none'; }
+  }
+  function clearLogo(){ localStorage.removeItem(LOGO_KEY); $('topLogo').src=''; $('topLogo').style.display='none'; $('logoUpload').value=''; }
+
+  /* -------------------------
+     Session & inactivity
+     -------------------------*/
+  function setSession(userContext){
+    // userContext: { customerId, userId }
+    const sess = { loggedIn:true, expiry: Date.now() + SESSION_TIMEOUT_MS, user: userContext };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(sess));
+    resetInactivityTimer();
+    registerActivityHandlers();
+  }
+  function clearSession(){
+    localStorage.removeItem(SESSION_KEY);
+    if(inactivityTimer) clearTimeout(inactivityTimer);
+    removeActivityHandlers();
+  }
+  function checkSessionOnLoad(){
+    const raw = localStorage.getItem(SESSION_KEY);
+    if(raw){
+      try{
+        const s = JSON.parse(raw);
+        if(s && s.loggedIn && s.expiry > Date.now()){
+          // logged in
+          $('loginPage').style.display='none';
+          $('appContent').style.display='block';
+          resetInactivityTimer();
+          registerActivityHandlers();
+          init();
+          loadLogo();
+          return;
+        }
+      }catch(e){}
+    }
+    // otherwise show login
+    clearSession();
+    $('loginPage').style.display='flex';
+    $('appContent').style.display='none';
+  }
+
+  function registerActivityHandlers(){
+    ['click','mousemove','keypress','touchstart'].forEach(ev => window.addEventListener(ev, resetInactivityTimer, true));
+  }
+  function removeActivityHandlers(){ ['click','mousemove','keypress','touchstart'].forEach(ev => window.removeEventListener(ev, resetInactivityTimer, true)); }
+
+  function resetInactivityTimer(){
+    if(inactivityTimer) clearTimeout(inactivityTimer);
+    const raw = localStorage.getItem(SESSION_KEY);
+    if(raw){
+      try{
+        const s = JSON.parse(raw);
+        s.expiry = Date.now() + SESSION_TIMEOUT_MS;
+        localStorage.setItem(SESSION_KEY, JSON.stringify(s));
+      }catch(e){}
+    }
+    inactivityTimer = setTimeout(() => {
+      alert('Session timed out due to inactivity.');
+      logout();
+    }, SESSION_TIMEOUT_MS);
+  }
+
+  /* -------------------------
+     Login
+     -------------------------*/
+  function login(ev){
+    ev.preventDefault();
+    const cid = $('customerId').value.trim();
+    const uid = $('userId').value.trim();
+    const pwd = $('password').value.trim();
+    const msg = $('loginMsg');
+
+    // demo credentials
+    const ok = (cid==='000001' && uid==='venkatesh' && pwd==='8989') || (cid==='000011' && uid==='venkatesh1' && pwd==='1234');
+
+    if(!ok){
+      msg.innerHTML = '<span class="login-error">Invalid credentials. Please try again.</span>';
+      return false;
+    }
+
+    // check subscription (from localStorage)
+    if(!isSubscriptionActive(cid, uid)){
+      // open recharge page automatically (and remember pending login)
+      msg.innerHTML = '<span class="login-error">Subscription inactive or expired. Redirecting to recharge...</span>';
+      pendingLoginContext = { customerId: cid, userId: uid };
+      setTimeout(()=> {
+        $('loginMsg').innerHTML = '';
+        openRechargePageForPending();
+      }, 700);
+      return false;
+    }
+
+    // success
+    msg.innerHTML = '<span class="login-success">Login successful.</span>';
+    setTimeout(()=>{
+      $('loginPage').style.display='none'; $('appContent').style.display='block';
+      setSession({ customerId: cid, userId: uid });
+      init();
+      loadLogo();
+    }, 700);
+
+    return false;
+  }
+
+  function logout(){
+    clearSession();
+    $('loginPage').style.display='flex';
+    $('appContent').style.display='none';
+  }
+
+  /* -------------------------
+     Init & UI navigation
+     -------------------------*/
+  window.onload = checkSessionOnLoad;
+  function init(){
+    loadItems(); loadInvoices();
+    renderItemsTable();
+    updateTopTime();
+    setInterval(updateTopTime, 60000);
+    renderPlans();
+    renderSummaryTable();
+    updateAdminDisplay();
+    updateSubsDisplay();
+  }
+
+  function updateTopTime(){ $('topTime').textContent = new Date().toLocaleString(); }
+
+  function show(page){
+    resetInactivityTimer();
+    ['items','billing','summary','rechargePage'].forEach(p => {
+      $(p).style.display = p === page ? 'block' : 'none';
+      const navBtn = $('nav' + p.charAt(0).toUpperCase() + p.slice(1));
+      if(navBtn) navBtn.classList.toggle('active', p===page);
+      if(p==='billing' && p===page) showBillingUI();
+      if(p==='summary' && p===page) renderSummaryTable();
+      if(p==='items' && p===page) renderItemsTable();
+    });
+  }
+
+  /* -------------------------
+     Items management (existing)
+     -------------------------*/
+  function renderItemsTable(){
+    $('items').innerHTML = `
+      <h2 style="margin:0; text-align: center;">Items Management</h2>
+      <div class="small-muted">Add, edit, delete items with price & GST</div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="btn" style="padding:8px 16px;" onclick="deleteSelectedItems()">Delete</button>
+          <span id="itemBulkAlert" class="alert-msg"></span>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button class="btn" onclick="showAddItemModal()">+ Add New Item</button>
+          <button class="btn ghost" onclick="show('rechargePage')">Recharge</button>
+        </div>
+      </div>
+      <table id="itemsTable" style="margin-top:14px">
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="selectAllItems" onchange="toggleAllCheckboxes(this)"></th>
+            <th>Item Name</th>
+            <th>Unit Price (₹)</th>
+            <th>GST %</th>
+            <th class="right">Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    `;
+    const tbody = $('items').querySelector('#itemsTable tbody');
+    tbody.innerHTML = '';
+    items.forEach((it, idx) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td><input type="checkbox" class="itemCheckbox" data-idx="${idx}"></td>
+        <td>${it.name}</td><td>₹${parseFloat(it.price).toFixed(2)}</td>
+        <td>${it.gst}%</td>
+        <td class="right">
+          <button class="btn ghost" onclick="editItem(${idx})">Edit</button>
+          <button class="btn" style="margin-left:8px" onclick="deleteItemSingle(${idx})">Delete</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+    $('selectAllItems').checked = false;
+  }
+
+  function toggleAllCheckboxes(box){ const cs = document.getElementsByClassName('itemCheckbox'); for(const c of cs) c.checked = box.checked; }
+  function getCheckedItemIndexes(){ const cs = document.getElementsByClassName('itemCheckbox'); const sel=[]; for(const c of cs) if(c.checked) sel.push(parseInt(c.getAttribute('data-idx'))); return sel; }
+  function deleteSelectedItems(){ const msg=$('itemBulkAlert'); msg.textContent=''; const sel=getCheckedItemIndexes(); if(sel.length===0){ msg.textContent='Please select at least one item'; setTimeout(()=>msg.textContent='',1500); return;} sel.sort((a,b)=>b-a).forEach(idx=>items.splice(idx,1)); saveItems(); renderItemsTable(); msg.textContent='Items deleted!'; setTimeout(()=>msg.textContent='',1000); }
+  function deleteItemSingle(idx){ if(confirm('Delete this item?')){ items.splice(idx,1); saveItems(); renderItemsTable(); } }
+
+  function showAddItemModal(){ editIndex = null; $('modalTitle').textContent='Add Item'; $('modalName').value=''; $('modalPrice').value=''; $('modalGst').value=''; $('itemSaveMsg').textContent=''; $('itemModal').style.display='flex'; }
+  function closeModal(){ $('itemModal').style.display='none'; }
+  function saveModal(e){ if(e) e.preventDefault(); const name=$('modalName').value.trim(), price=parseFloat($('modalPrice').value), gst=parseFloat($('modalGst').value); if(!name||isNaN(price)||isNaN(gst)){ alert('Please fill valid item data'); return false; } const item={name,price,gst}; if(editIndex===null) items.push(item); else items[editIndex]=item; saveItems(); renderItemsTable(); $('itemSaveMsg').textContent="Item '"+name+"' saved!"; $('modalName').value=''; $('modalPrice').value=''; $('modalGst').value=''; setTimeout(()=>{ $('itemSaveMsg').textContent=''; closeModal(); },1000); return false; }
+  function editItem(i){ editIndex=i; const it=items[i]; $('modalTitle').textContent='Edit Item'; $('modalName').value=it.name; $('modalPrice').value=it.price; $('modalGst').value=it.gst; $('itemSaveMsg').textContent=''; $('itemModal').style.display='flex'; }
+
+  /* -------------------------
+     Billing (existing)
+     -------------------------*/
+  function showBillingUI(){
+    $('billing').innerHTML = `
+      <h2 style="margin:0;text-align:center;">Create Invoice</h2>
+      <div class="small-muted">Add items to your invoice</div>
+      <div class="field"><label class="small-muted">Customer Name <span style="color:red">*</span></label>
+        <input type="text" id="billingCustomer" placeholder="Enter customer name" value="${currentInvoiceCustomer}"></div>
+      <div class="field"><label class="small-muted">Search Item</label>
+        <input type="text" id="billingSearch" placeholder="Search items..." oninput="renderBillingItemOptions()"></div>
+      <div class="field"><label class="small-muted">Select Item</label>
+        <select id="billingSelectItem"></select></div>
+      <div class="field"><label class="small-muted">Quantity</label>
+        <input type="number" id="billingQty" value="1"></div>
+      <button class="btn" onclick="addBillingItem()">Add Item</button>
+      <div style="margin-top:12px;" id="billingInvoiceTable"></div>
+      <div style="margin-top:18px;display:flex;gap:12px;">
+        <button class="btn" onclick="finalizeInvoice()">Complete Bill</button>
+        <button class="btn ghost" onclick="resetInvoice()">Reset</button>
+      </div>
+    `;
+    renderBillingItemOptions();
+    renderInvoiceTable();
+  }
+
+  function renderBillingItemOptions(){
+    const select = $('billingSelectItem');
+    const searchVal = $('billingSearch') ? $('billingSearch').value.trim().toLowerCase() : '';
+    let filtered = items;
+    if(searchVal.length>0){
+      filtered = items.filter(it => it.name.toLowerCase().includes(searchVal) || (''+it.price).includes(searchVal) || (''+it.gst).includes(searchVal));
+    }
+    select.innerHTML = filtered.length === 0 ? `<option disabled>No items found</option>` : filtered.map(it=>`<option value="${items.indexOf(it)}">${it.name} (₹${it.price}, GST ${it.gst}%)</option>`).join('');
+  }
+
+  function addBillingItem(){
+    const idx = parseInt($('billingSelectItem').value), qty = parseInt($('billingQty').value), customer = $('billingCustomer').value.trim();
+    if(isNaN(idx) || isNaN(qty) || qty <= 0){ alert('Enter valid quantity.'); return; }
+    if(!customer){ alert('Enter customer name.'); return; }
+    currentInvoiceCustomer = customer;
+    const it = items[idx];
+    const existingIdx = currentInvoiceItems.findIndex(x => x.idx === idx);
+    if(existingIdx !== -1) currentInvoiceItems[existingIdx].qty += qty;
+    else currentInvoiceItems.push({ idx, qty });
+    renderInvoiceTable();
+  }
+
+  function renderInvoiceTable(){
+    const div = $('billingInvoiceTable');
+    if(currentInvoiceItems.length === 0){ div.innerHTML = "<div class='small-muted'>No items added.</div>"; return; }
+    let total=0, totalGst=0;
+    const rows = currentInvoiceItems.map(x => {
+      const it = items[x.idx], amt = it.price * x.qty, gstAmt = (amt * it.gst)/100;
+      total += amt; totalGst += gstAmt;
+      return `<tr><td>${it.name}</td><td>${x.qty}</td><td>₹${amt.toFixed(2)}</td><td>${it.gst}%</td><td>₹${gstAmt.toFixed(2)}</td><td class="right"><button class="btn ghost" onclick="removeBillingItem(${x.idx})">Remove</button></td></tr>`;
+    }).join('');
+    div.innerHTML = `<table style="margin-top:8px;"><thead><tr>
+      <th>Item</th><th>Qty</th><th>Amount</th><th>GST%</th><th>GST Amt</th><th class="right">Actions</th>
+      </tr></thead><tbody>${rows}</tbody>
+      <tfoot>
+        <tr><td colspan="2"></td><td colspan="2" class="right">Total</td><td>₹${total.toFixed(2)}</td><td></td></tr>
+        <tr><td colspan="2"></td><td colspan="2" class="right">Total GST</td><td>₹${totalGst.toFixed(2)}</td><td></td></tr>
+        <tr style="font-weight:600;"><td colspan="2"></td><td colspan="2" class="right">Grand Total</td><td>₹${(total+totalGst).toFixed(2)}</td><td></td></tr>
+      </tfoot></table>`;
+  }
+
+  function removeBillingItem(idx){ currentInvoiceItems = currentInvoiceItems.filter(x => x.idx !== idx); renderInvoiceTable(); }
+  function finalizeInvoice(){
+    if(!currentInvoiceCustomer || currentInvoiceItems.length === 0){ alert('Enter customer and items.'); return; }
+    let total=0, totalGst=0;
+    currentInvoiceItems.forEach(x => { const it = items[x.idx]; total += it.price * x.qty; totalGst += (it.price * x.qty * it.gst)/100; });
+    invoices.push({
+      number: invoices.length ? Math.max(...invoices.map(inv=>inv.number)) + 1 : 1,
+      date: (function(){ const d=new Date(); return formatDate(d); })(),
+      customer: currentInvoiceCustomer,
+      total: (total+totalGst).toFixed(2),
+      items: JSON.parse(JSON.stringify(currentInvoiceItems))
+    });
+    saveInvoices();
+    resetInvoice();
+    show('summary');
+    renderSummaryTable();
+  }
+  function resetInvoice(){ currentInvoiceItems = []; currentInvoiceCustomer=''; showBillingUI(); }
+
+  /* -------------------------
+     Summary
+     -------------------------*/
+  function parseDateFromPicker(val){ if(!val) return null; const [y,m,d] = val.split('-'); return new Date(+y, +m-1, +d); }
+  function parseBillDate(str){ const [dd,mm,yyyy] = str.split('/'); return new Date(+yyyy, +mm-1, +dd); }
+  function onDateFilterChange(){ const start=$('billFilterStart').value, end=$('billFilterEnd').value, msg=$('billSummaryMsg'); msg.textContent=''; if(start&&end && parseDateFromPicker(end) < parseDateFromPicker(start)){ msg.textContent='End date cannot be before Start date.'; $('billTotalCell').textContent='₹0.00'; $('summaryTable').innerHTML=''; return; } renderSummaryTable(); }
+  function renderSummaryTable(){
+    const tbody = $('summaryTable');
+    let start = $('billFilterStart').value, end = $('billFilterEnd').value, search = $('billFilterId').value.trim();
+    let filtered = invoices;
+    if(start){ const s = parseDateFromPicker(start); filtered = filtered.filter(inv => parseBillDate(inv.date) >= s); }
+    if(end){ const e = parseDateFromPicker(end); filtered = filtered.filter(inv => parseBillDate(inv.date) <= e); }
+    if(search) filtered = filtered.filter(inv => String(inv.number).includes(search));
+    if(filtered.length === 0){ tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#911;">No bills found for given filter/search</td></tr>`; $('billTotalCell').textContent='₹0.00'; return; }
+    tbody.innerHTML = filtered.map(inv => `<tr>
+      <td>${inv.number}</td>
+      <td>${inv.date}</td>
+      <td>${inv.customer}</td>
+      <td class="amount-cell">₹${inv.total}</td>
+      <td class="right">
+        <button class="btn ghost" onclick="viewInvoice(${invoices.indexOf(inv)})">View</button>
+        <button class="btn" onclick="printInvoice(${invoices.indexOf(inv)})">Print</button>
+      </td>
+    </tr>`).join('');
+    const total = filtered.reduce((acc,b)=> acc + parseFloat(b.total || 0), 0);
+    $('billTotalCell').textContent = '₹'+ total.toFixed(2);
+  }
+  function clearBillFilters(){ $('billFilterStart').value=''; $('billFilterEnd').value=''; $('billFilterId').value=''; $('billSummaryMsg').textContent=''; renderSummaryTable(); }
+
+  /* -------------------------
+     Print & View invoice
+     -------------------------*/
+  function printInvoice(idx){
+    const inv = invoices[idx];
+    let html = `<div style="font-family:monospace; font-size:12px; width:80mm; max-width:80mm; margin:0 auto; padding:0;">
+      <div style="text-align:center; font-weight:bold; font-size:14px; margin-bottom:6px;">RETAIL CLOUDS</div>
+      <div style="text-align:center; margin-bottom:8px;">Professional Billing Receipt</div>
+      <div>Bill ID: ${inv.number}</div>
+      <div>Date: ${inv.date}</div>
+      <div>Customer: ${inv.customer}</div>
+      <hr style="border:none; border-top:1px dashed #aaa; margin:6px 0;">
+      <table style="width:100%; font-size:12px; border-collapse:collapse;"><thead><tr>
+        <th style="text-align:left;">Item</th><th style="text-align:center;">Qty</th><th style="text-align:right;">Amount</th>
+      </tr></thead><tbody>`;
+    let total=0, totalGst=0;
+    inv.items.forEach(it=>{
+      const item = items[it.idx], amt = item.price * it.qty, gstAmt = (amt * item.gst)/100;
+      total += amt; totalGst += gstAmt;
+      html += `<tr><td style="word-break:break-word;">${item.name}</td><td style="text-align:center;">${it.qty}</td><td style="text-align:right;">₹${amt.toFixed(2)}</td></tr>
+        <tr><td colspan="2" style="font-size:10px; text-align:right;">GST ${item.gst}%</td><td style="text-align:right; font-size:10px;">₹${gstAmt.toFixed(2)}</td></tr>`;
+    });
+    html += `</tbody></table><hr style="border:none; border-top:1px dashed #aaa; margin:6px 0;">
+      <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:12px; margin-top:4px;"><div>Total</div><div>₹${total.toFixed(2)}</div></div>
+      <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:12px;"><div>Total GST</div><div>₹${totalGst.toFixed(2)}</div></div>
+      <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:14px; margin-top:6px;"><div>Grand Total</div><div>₹${(total+totalGst).toFixed(2)}</div></div>
+      <div style="text-align:center; margin-top:10px;">** Thank You! Visit Again **</div></div>`;
+    const win = window.open('','printWindow','width=350,height=600');
+    win.document.write(`<html><head><title>Print Invoice</title><style>
+      @media print { @page { size: 80mm auto; margin: 2mm; } body { font-family: monospace; font-size: 12px; margin: 0; } table { width:100%; border-collapse: collapse; page-break-inside: avoid; } th, td { padding:2px 4px; } hr{border:none;border-top:1px dashed #aaa;margin:4px 0;} }
+      body{font-family:monospace;font-size:12px;margin:4px;}
+    </style></head><body>`);
+    win.document.write(html); win.document.write('</body></html>');
+    win.document.close(); win.focus();
+    setTimeout(()=>{ win.print(); win.close(); },500);
+  }
+
+  function viewInvoice(idx){
+    const inv = invoices[idx];
+    let html = `<h2 style="margin-top:0;margin-bottom:2px;">Bill ID_${inv.number}</h2>
+      <div class="small-muted" style="margin-bottom:8px;">${inv.date}, Customer: ${inv.customer}</div>
+      <table style="margin-top:8px;width:100%;"><thead><tr><th>Item</th><th>Qty</th><th>Amount</th><th>GST%</th><th>GST Amt</th></tr></thead><tbody>`;
+    let total=0, totalGst=0;
+    inv.items.forEach(it=>{
+      const item = items[it.idx], amt = item.price * it.qty, gstAmt = (amt * item.gst)/100;
+      total += amt; totalGst += gstAmt;
+      html += `<tr><td>${item.name}</td><td>${it.qty}</td><td>₹${amt.toFixed(2)}</td><td>${item.gst}%</td><td>₹${gstAmt.toFixed(2)}</td></tr>`;
+    });
+    html += `</tbody><tfoot>
+      <tr><td colspan="2"></td><td colspan="2" class="right">Total</td><td>₹${total.toFixed(2)}</td></tr>
+      <tr><td colspan="2"></td><td colspan="2" class="right">Total GST</td><td>₹${totalGst.toFixed(2)}</td></tr>
+      <tr style="font-weight:600;"><td colspan="2"></td><td colspan="2" class="right">Grand Total</td><td>₹${(total+totalGst).toFixed(2)}</td></tr>
+    </tfoot></table>`;
+    $('invoiceModalContent').innerHTML = `<button class="close" onclick="closeInvoiceModal()">×</button>${html}`;
+    $('invoiceModal').style.display = 'flex';
+  }
+  function closeInvoiceModal(){ $('invoiceModal').style.display='none'; $('invoiceModalContent').innerHTML = `<button class="close" onclick="closeInvoiceModal()">×</button>`; }
+
+/* -------------------------
+   Recharge Logic (final part)
+   -------------------------*/
+function renderPlans() {
+  const container = $('plansContainer');
+  container.innerHTML = '';
+  PLANS.forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'plan-card';
+    div.innerHTML = `
+      <div style="font-weight:700;">${p.name}</div>
+      <div class="plan-price">${money(p.price)}</div>
+      <button class="btn" style="margin-top:8px;" onclick="startRecharge('${p.id}')">Recharge</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function openRechargeFromApp() {
+  show('rechargePage');
+}
+
+function closeRechargePage() {
+  show('items');
+}
+
+function startRecharge(planId) {
+  const plan = PLANS.find(p => p.id === planId);
+  if (!plan) return;
+  selectedPlanForPay = plan;
+
+  const sessRaw = localStorage.getItem(SESSION_KEY);
+  let cid = '', uid = '';
+  if (sessRaw) {
+    try {
+      const s = JSON.parse(sessRaw);
+      cid = s.user.customerId;
+      uid = s.user.userId;
+    } catch (e) {}
+  }
+
+  $('payDetails').innerHTML = `
+    <div><strong>Customer:</strong> ${cid || '(not logged in)'}</div>
+    <div><strong>Plan:</strong> ${plan.name}</div>
+    <div><strong>Amount:</strong> ${money(plan.price)}</div>
+  `;
+  $('payMsg').textContent = '';
+  $('payPassword').value = '';
+  $('payModal').style.display = 'flex';
+}
+
+function closePayModal() {
+  $('payModal').style.display = 'none';
+  selectedPlanForPay = null;
+}
+
+function confirmPayment() {
+  const pwd = $('payPassword').value.trim();
+  if (!pwd) {
+    $('payMsg').textContent = 'Enter password to simulate payment.';
+    return;
+  }
+  if (!selectedPlanForPay) return;
+
+  const sessRaw = localStorage.getItem(SESSION_KEY);
+  let cid = '', uid = '';
+  if (sessRaw) {
+    try {
+      const s = JSON.parse(sessRaw);
+      cid = s.user.customerId;
+      uid = s.user.userId;
+    } catch (e) {}
+  } else if (pendingLoginContext) {
+    cid = pendingLoginContext.customerId;
+    uid = pendingLoginContext.userId;
+  }
+
+  if (!cid || !uid) {
+    $('payMsg').textContent = 'No active user context.';
+    return;
+  }
+
+  const subs = getSubscriptions();
+  const key = cid + '|' + uid;
+  const now = Date.now();
+  const newExpiry = Math.max(now, subs[key] || 0) + selectedPlanForPay.days * 24 * 60 * 60 * 1000;
+  subs[key] = newExpiry;
+  saveSubscriptions(subs);
+
+  // Add money to admin balance
+  addAdminBalance(selectedPlanForPay.price);
+
+  $('payMsg').style.color = '#017501';
+  $('payMsg').textContent = 'Payment successful! Subscription activated.';
+  setTimeout(() => {
+    $('payModal').style.display = 'none';
+    selectedPlanForPay = null;
+    updateSubsDisplay();
+
+    if (pendingLoginContext) {
+      // Automatically login now
+      const ctx = pendingLoginContext;
+      pendingLoginContext = null;
+      $('loginMsg').innerHTML = '<span class="login-success">Subscription activated! Logging in...</span>';
+      setTimeout(() => {
+        $('loginPage').style.display = 'none';
+        $('appContent').style.display = 'block';
+        setSession({ customerId: ctx.customerId, userId: ctx.userId });
+        init();
+      }, 800);
+    }
+  }, 700);
+}
+
+function openRechargePageForPending() {
+  $('loginPage').style.display = 'none';
+  $('appContent').style.display = 'block';
+  show('rechargePage');
+  renderPlans();
+}
+
+function updateSubsDisplay() {
+  const raw = localStorage.getItem(SESSION_KEY);
+  if (!raw) return;
+  try {
+    const s = JSON.parse(raw);
+    const cid = s.user.customerId;
+    const uid = s.user.userId;
+    const daysLeft = getSubscriptionDaysLeft(cid, uid);
+    $('subStatus').textContent = daysLeft > 0 ? `Active: ${daysLeft} days left` : 'Inactive';
+  } catch (e) {}
+}
+/* -------------------------
+     Excel bulk upload using SheetJS
+     -------------------------*/
+  function triggerExcel(){ const f = $('excelUpload').files[0]; if(!f){ alert('Choose an Excel file first'); return; } readExcelFile(f); }
+
+  function readExcelFile(file){
+    const reader = new FileReader();
+    reader.onload = function(e){
+      try{
+        const data = new Uint8Array(e.target.result);
+        const wb = XLSX.read(data, { type: 'array' });
+        // use first sheet
+        const sheetName = wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        // expected columns: name, price, gst (case-insensitive)
+        let added=0, skipped=0;
+        json.forEach(row=>{
+          const keys = Object.keys(row);
+          const lower = {};
+          keys.forEach(k => lower[k.toLowerCase().trim()] = k);
+          // find appropriate column names
+          const nameKey = lower['name'] || lower['item'] || lower['item name'];
+          const priceKey = lower['price'] || lower['unit price'] || lower['amount'];
+          const gstKey = lower['gst'] || lower['tax'];
+          if(!nameKey || !priceKey){ skipped++; return; }
+          const name = String(row[nameKey]).trim();
+          const price = parseFloat(row[priceKey]) || 0;
+          const gst = gstKey ? (parseFloat(row[gstKey]) || 0) : 0;
+          if(!name){ skipped++; return; }
+          items.push({ name, price, gst });
+          added++;
+        });
+        saveItems();
+        renderItemsTable();
+        alert('Excel upload complete. Added: '+added+', Skipped: '+skipped);
+      }catch(err){
+        console.error(err);
+        alert('Failed to parse Excel file.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  /* -------------------------
+     Subscription header display
+     -------------------------*/
+  function updateSubsDisplay(){
+    const sessRaw = localStorage.getItem(SESSION_KEY);
+    if(sessRaw){
+      try{
+        const sess = JSON.parse(sessRaw);
+        if(sess && sess.user){
+          const daysLeft = getSubscriptionDaysLeft(sess.user.customerId, sess.user.userId);
+          if(daysLeft > 0) $('subStatus').textContent = daysLeft + ' day(s) left';
+          else $('subStatus').textContent = 'No active plan';
+          return;
+        }
+      }catch(e){}
+    }
+    // fallback: show nothing
+    $('subStatus').textContent = '';
+  }
+
+  /* -------------------------
+     Excel: optional helper to auto-attach listener
+     -------------------------*/
+  $('excelUpload').addEventListener('change', (e) => {
+    // nothing auto - user must click Upload button (triggerExcel)
+  });
+
+  /* -------------------------
+     On-load defaults
+     -------------------------*/
+  // default items if empty
+  if(!localStorage.getItem(ITEMS_KEY)){
+    items = [{ name:'Sample Item A', price:100, gst:18 }, { name:'Sample Item B', price:50, gst:5 }];
+    saveItems();
+  }
+
+  // ensure invoices key exists
+  if(!localStorage.getItem(INVOICES_KEY)) saveInvoices();
+
+  // ensure admin balance exists
+  if(localStorage.getItem(ADMIN_KEY) === null) localStorage.setItem(ADMIN_KEY, '0.00');
+
+  // render plans initially
+  function updateAdminDisplayOnLoad(){ updateAdminDisplay(); renderPlans(); updateSubsDisplay(); }
+  setTimeout(updateAdminDisplayOnLoad, 300);
+
+  // expose some functions to global for buttons
+  window.saveLogo = saveLogo;
+  window.clearLogo = clearLogo;
+  window.showAddItemModal = showAddItemModal;
+  window.deleteSelectedItems = deleteSelectedItems;
+  window.editItem = editItem;
+  window.deleteItemSingle = deleteItemSingle;
+  window.saveModal = saveModal;
+  window.closeModal = closeModal;
+  window.show = show;
+  window.showBillingUI = showBillingUI;
+  window.resetInvoice = resetInvoice;
+  window.openRechargeFromApp = openRechargeFromApp;
+  window.openRechargePageForPending = openRechargePageForPending;
+  window.closeRechargePage = closeRechargePage;
+  window.startRecharge = startRecharge;
+  window.triggerExcel = triggerExcel;
+  window.renderItemsTable = renderItemsTable;
+  window.renderSummaryTable = renderSummaryTable;
+  window.renderPlans = renderPlans;
+  window.confirmPayment = confirmPayment;
+  window.closePayModal = closePayModal;
+  window.logout = logout;
+</script>
+</body>
+</html>
